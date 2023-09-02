@@ -3,79 +3,65 @@ const http = require("http");
 const app = express();
 const port = process.env.PORT || 5000;
 const server = http.createServer(app);
-const io = require("socket.io")(server);
 
 // Middleware
 app.use(express.json());
 
-// Room storage
-const rooms = {};
+let players = [];
 
 app.get('/', (req, res) => {
   res.send('Online');
 });
 
-io.on("connect", (socket) => {
-  console.log("connected");
-  console.log(socket.id, "has joined");
-  
-  socket.on('joinRoom', (roomId) => {
-    socket.join(roomId);
-    console.log(`Client ${socket.id} joined room: ${roomId}`);
-    
-    // Store socket in the room
-    if (!rooms[roomId]) {
-      rooms[roomId] = new Set();
-    }
-    rooms[roomId].add(socket);
-  });
-  
-  socket.on('leaveRoom', (roomId) => {
-    socket.leave(roomId);
-    console.log(`Client ${socket.id} left room: ${roomId}`);
-    
-    // Remove socket from the room
-    if (rooms[roomId]) {
-      rooms[roomId].delete(socket);
-      if (rooms[roomId].size === 0) {
-        delete rooms[roomId];
-      }
-    }
-  });
 
-  socket.on('shareLocation', (data) => {
-    const room_id = data.room_id;
-    const location_data = data.location_data;
-    console.log("Data: ", data);
-    io.sockets.in(room_id).emit('getFriendPosition', location_data);
-  });
-
+// Create
+app.post('/players', (req, res) => {
+  const newPlayer = req.body;
+  players.push(newPlayer);
+  res.status(201).json(newPlayer);
 });
 
-// Clean all rooms
-function cleanRooms() {
-  for (const roomId in rooms) {
-    if (rooms.hasOwnProperty(roomId)) {
-      io.sockets.in(roomId).clients((error, clients) => {
-        if (clients && clients.length > 0) {
-          clients.forEach(clientId => {
-            const socket = io.sockets.sockets.get(clientId);
-            if (socket) {
-              socket.leave(roomId);
-              rooms[roomId].delete(socket);
-            }
-          });
-        }
-      });
-      delete rooms[roomId];
-    }
+// Read (List all players)
+app.get('/players', (req, res) => {
+  res.json(players);
+});
+
+// Read (Get a single player by ID)
+app.get('/players/:id', (req, res) => {
+  const playerId = req.params.id;
+  const player = players.find((player) => player.id === playerId);
+  if (!player) {
+    res.status(404).send('Player not found');
+  } else {
+    res.json(player);
   }
-}
-
-// Clean rooms on server restart
-server.on('close', () => {
-  cleanRooms();
 });
+
+// Update (Edit a player by ID)
+app.put('/players/:id', (req, res) => {
+  const playerId = req.params.id;
+  const updatedPlayer = req.body;
+  const playerIndex = players.findIndex((player) => player.id === playerId);
+  if (playerIndex === -1) {
+    res.status(404).send('Player not found');
+  } else {
+    players[playerIndex] = updatedPlayer;
+    res.json(updatedPlayer);
+  }
+});
+
+// Delete (Remove a player by ID)
+app.delete('/players/:id', (req, res) => {
+  const playerId = req.params.id;
+  const playerIndex = players.findIndex((player) => player.id === playerId);
+  if (playerIndex === -1) {
+    res.status(404).send('Player not found');
+  } else {
+    const deletedPlayer = players.splice(playerIndex, 1)[0];
+    res.json(deletedPlayer);
+  }
+});
+
 
 // Start the server
 server.listen(port, "0.0.0.0", () => {
