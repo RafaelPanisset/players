@@ -1,9 +1,13 @@
-const express = require('express');
-const bodyParser = require('body-parser');
+const express = require("express");
+const http = require("http");
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 5000;
+const server = http.createServer(app);
 
-app.use(bodyParser.json());
+// Middleware
+app.use(express.json());
+
+
 
 let players = [];
 
@@ -55,6 +59,9 @@ app.delete('/players/:id', (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is listening on port ${port}`);
+
+
+// Start the server
+server.listen(port, "0.0.0.0", () => {
+  console.log("server started");
 });
